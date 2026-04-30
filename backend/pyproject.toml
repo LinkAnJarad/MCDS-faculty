@@ -1,0 +1,16 @@
+[project]
+name = "backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.18.4",
+    "email-validator>=2.3.0",
+    "fastapi[standard]>=0.135.3",
+    "httpx>=0.28.1",
+    "psycopg[binary]>=3.3.3",
+    "pulp>=3.3.0",
+    "pydantic-settings>=2.13.1",
+    "python-dotenv>=1.2.2",
+    "python-jose[cryptography]>=3.5.0",
+    "sqlalchemy>=2.0.49",
+]
