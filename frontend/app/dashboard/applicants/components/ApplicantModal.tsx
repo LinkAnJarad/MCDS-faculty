@@ -41,18 +41,19 @@ export function ApplicantModal({ existing, onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [form, setForm] = useState<ApplicantCreate>({
+  const [form, setForm] = useState<ApplicantCreate & { _years: number; _research: number; _certs: number }>({
     first_name: existing?.first_name ?? "",
     last_name: existing?.last_name ?? "",
     email: existing?.email ?? "",
     highest_degree: existing?.highest_degree ?? "bachelors",
-    years_experience: existing?.years_experience ?? 0,
-    research_outputs: existing?.research_outputs ?? 0,
-    certifications: existing?.certifications ?? 0,
+    _years: existing?.dynamic_data?.years_experience ?? 0,
+    _research: existing?.dynamic_data?.research_outputs ?? 0,
+    _certs: existing?.dynamic_data?.certifications ?? 0,
     specialization: existing?.specialization ?? "",
     teaching_units_available: existing?.teaching_units_available ?? 18,
     applied_position_id: existing?.applied_position_id ?? null,
     status: existing?.status ?? "pending",
+    is_internal: existing?.is_internal ?? false,
   });
 
   const set = <K extends keyof ApplicantCreate>(k: K, v: ApplicantCreate[K]) =>
@@ -81,7 +82,16 @@ export function ApplicantModal({ existing, onClose, onSaved }: Props) {
         ...form,
         specialization: form.specialization || undefined,
         applied_position_id: form.applied_position_id || null,
+        dynamic_data: {
+          years_experience: form._years,
+          research_outputs: form._research,
+          certifications: form._certs,
+        }
       };
+      // remove transient fields
+      delete (payload as any)._years;
+      delete (payload as any)._research;
+      delete (payload as any)._certs;
       if (isEdit && existing) {
         await applicantsApi.update(token, existing.id, payload);
       } else {
@@ -225,8 +235,8 @@ export function ApplicantModal({ existing, onClose, onSaved }: Props) {
                 min={0}
                 className="input"
                 required
-                value={form.years_experience}
-                onChange={(e) => set("years_experience", Number(e.target.value))}
+                value={form._years}
+                onChange={(e) => set("_years", Number(e.target.value)) as any}
               />
             </div>
             <div>
@@ -236,8 +246,8 @@ export function ApplicantModal({ existing, onClose, onSaved }: Props) {
                 type="number"
                 min={0}
                 className="input"
-                value={form.research_outputs}
-                onChange={(e) => set("research_outputs", Number(e.target.value))}
+                value={form._research}
+                onChange={(e) => set("_research", Number(e.target.value)) as any}
               />
             </div>
             <div>
@@ -247,8 +257,8 @@ export function ApplicantModal({ existing, onClose, onSaved }: Props) {
                 type="number"
                 min={0}
                 className="input"
-                value={form.certifications}
-                onChange={(e) => set("certifications", Number(e.target.value))}
+                value={form._certs}
+                onChange={(e) => set("_certs", Number(e.target.value)) as any}
               />
             </div>
           </div>
@@ -301,11 +311,12 @@ export function ApplicantModal({ existing, onClose, onSaved }: Props) {
               <option value="">— None —</option>
               {positions.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.title} {p.department ? `(${p.department.name})` : ""}
+                  {p.title} {p.department ? `(${p.department.name})` : ""} {!p.is_open ? "(Closed)" : ""}
                 </option>
               ))}
             </select>
           </div>
+
 
           {error && (
             <div

@@ -17,8 +17,10 @@ import {
 } from "lucide-react";
 import {
   optimizationApi,
+  positionsApi,
   type OptimizationResult,
   type AllocationItem,
+  type Position,
 } from "@/lib/api";
 import { exportOptimizationPDF, exportOptimizationExcel } from "@/lib/export";
 
@@ -30,11 +32,26 @@ const DATA_KEYS = [
   { key: "teaching_units_available", label: "Teaching Units" },
 ];
 
-function AllocationCard({ item, index }: { item: AllocationItem; index: number }) {
+function AllocationCard({ 
+  item, 
+  index, 
+  onRemove,
+  openPositions,
+  onChangePosition,
+}: { 
+  item: AllocationItem; 
+  index: number; 
+  onRemove: (id: string) => void;
+  openPositions: Position[];
+  onChangePosition: (applicantId: string, newPositionId: string) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+
   return (
     <div
       className="card animate-fadein"
       style={{
+        position: "relative",
         animationDelay: `${index * 50}ms`,
         display: "flex",
         flexDirection: "column",
@@ -66,14 +83,46 @@ function AllocationCard({ item, index }: { item: AllocationItem; index: number }
             borderRadius: "var(--radius-sm)",
           }}
         >
-          <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 2 }}>
-            {item.department_name ?? "Position"}
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>
-            {item.position_title}
-          </div>
+          {isEditing ? (
+            <select
+              className="input"
+              style={{ width: "100%", padding: "4px 8px", fontSize: 13 }}
+              value={item.position_id}
+              onChange={(e) => {
+                onChangePosition(item.applicant_id, e.target.value);
+                setIsEditing(false);
+              }}
+              autoFocus
+              onBlur={() => setIsEditing(false)}
+            >
+              <option value={item.position_id}>{item.position_title} (Current)</option>
+              {openPositions.filter(p => p.id !== item.position_id).map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.title} {p.department ? `(${p.department.name})` : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 2 }}>
+                {item.department_name ?? "Position"}
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>
+                {item.position_title}
+              </div>
+            </>
+          )}
         </div>
       </div>
+
+      <button
+        onClick={() => setIsEditing(true)}
+        className="btn btn-ghost"
+        style={{ position: "absolute", top: 8, right: 32, padding: 4, color: "var(--color-text-muted)" }}
+        title="Change position"
+      >
+        <Sliders size={14} />
+      </button>
 
       {/* Stats */}
       <div style={{ display: "flex", gap: 12, fontSize: 12, color: "var(--color-text-muted)" }}>
@@ -99,6 +148,14 @@ function AllocationCard({ item, index }: { item: AllocationItem; index: number }
           }}
         />
       </div>
+      <button
+        onClick={() => onRemove(item.applicant_id)}
+        className="btn btn-ghost"
+        style={{ position: "absolute", top: 8, right: 8, padding: 4, color: "var(--color-danger)" }}
+        title="Remove this assignment"
+      >
+        <X size={14} />
+      </button>
     </div>
   );
 }
@@ -113,6 +170,12 @@ export function OptimizationClient() {
   const [maximizeCoverage, setMaximizeCoverage] = useState(false);
   const [saveAllocations, setSaveAllocations] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [applicantType, setApplicantType] = useState<"external" | "internal" | "both">("both");
+
+  const [draftAllocations, setDraftAllocations] = useState<AllocationItem[]>([]);
+  const [openPositions, setOpenPositions] = useState<Position[]>([]);
+  const [committing, setCommitting] = useState(false);
+  const [commitSuccess, setCommitSuccess] = useState(false);
 
   const handleExport = async (format: "pdf" | "excel") => {
     if (!result) return;
@@ -131,29 +194,56 @@ export function OptimizationClient() {
   const totalCustomWeight = Object.values(customWeights).reduce((s, v) => s + v, 0);
   const customWeightsValid = !useCustomWeights || Math.abs(totalCustomWeight - 100) < 0.1;
 
-  const handleRun = async (simulate: boolean) => {
+  const handleRun = async () => {
     if (!customWeightsValid) {
       setError(`Custom weights must sum to 100% (current: ${totalCustomWeight.toFixed(1)}%)`);
       return;
     }
     setRunning(true);
     setError(null);
+    setCommitSuccess(false);
     try {
       const token = await getToken();
       if (!token) throw new Error("Not authenticated.");
       const req = {
-        save_allocations: !simulate && saveAllocations,
+        save_allocations: false,
         maximize_coverage: maximizeCoverage,
         custom_weights: useCustomWeights && Object.keys(customWeights).length > 0 ? customWeights : undefined,
+        applicant_type: applicantType,
       };
-      const res = simulate
-        ? await optimizationApi.simulate(token, req)
-        : await optimizationApi.run(token, req);
+      const [res, pos] = await Promise.all([
+        optimizationApi.simulate(token, req),
+        positionsApi.list(token)
+      ]);
       setResult(res);
+      setDraftAllocations(res.allocations);
+      setOpenPositions(pos.filter(p => p.is_open));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Optimization failed.");
     } finally {
       setRunning(false);
+    }
+  };
+
+  const handleCommit = async () => {
+    setCommitting(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Not authenticated.");
+      await optimizationApi.commit(token, {
+        allocations: draftAllocations.map(a => ({
+          applicant_id: a.applicant_id,
+          position_id: a.position_id,
+          teaching_units: a.teaching_units,
+          alignment_score: a.alignment_score
+        }))
+      });
+      setCommitSuccess(true);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Commit failed.");
+    } finally {
+      setCommitting(false);
     }
   };
 
@@ -195,19 +285,20 @@ export function OptimizationClient() {
             </span>
           </label>
 
-          <label
-            style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}
-            id="opt-save-label"
-          >
-            <input
-              type="checkbox"
-              id="opt-save-allocations"
-              checked={saveAllocations}
-              onChange={(e) => setSaveAllocations(e.target.checked)}
-              style={{ accentColor: "var(--color-accent)" }}
-            />
-            <span style={{ color: "var(--color-text-secondary)" }}>Save allocations to database</span>
-          </label>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Target:</span>
+            <select
+              className="input"
+              style={{ width: 160, padding: "4px 8px", fontSize: 13 }}
+              value={applicantType}
+              onChange={(e) => setApplicantType(e.target.value as "external" | "internal" | "both")}
+              disabled={running}
+            >
+              <option value="both">All Applicants</option>
+              <option value="external">External Only</option>
+              <option value="internal">Internal Staff Only</option>
+            </select>
+          </div>
         </div>
 
         {/* What-if toggle */}
@@ -352,22 +443,14 @@ export function OptimizationClient() {
         {/* Action buttons */}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <button
-            id="opt-simulate-btn"
-            className="btn btn-ghost"
-            disabled={running}
-            onClick={() => handleRun(true)}
-          >
-            <Sliders size={14} /> Simulate (no save)
-          </button>
-          <button
             id="opt-run-btn"
             className="btn btn-primary"
             disabled={running || !customWeightsValid}
-            onClick={() => handleRun(false)}
+            onClick={handleRun}
             style={{ padding: "0.6rem 1.4rem" }}
           >
             <Zap size={14} />
-            {running ? "Solving…" : "Run Optimization"}
+            {running ? "Solving…" : "Run Optimizer (Draft Mode)"}
           </button>
         </div>
       </div>
@@ -399,7 +482,7 @@ export function OptimizationClient() {
               <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>{result.solver_message}</span>
             </div>
             <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-              {result.scores_saved ? "✓ Saved to DB" : "Preview only"}
+              {commitSuccess ? "✓ Saved to DB" : "Draft assignments — Review before committing"}
             </div>
           </div>
 
@@ -413,8 +496,8 @@ export function OptimizationClient() {
             }}
           >
             {[
-              { label: "Allocations Made", value: result.allocation_count, color: "var(--color-success)" },
-              { label: "Total Score", value: result.total_score.toFixed(2), color: "var(--color-accent)" },
+              { label: "Draft Allocations", value: draftAllocations.length, color: "var(--color-success)" },
+              { label: "Total Alignment Score", value: draftAllocations.reduce((acc, curr) => acc + curr.alignment_score, 0).toFixed(2), color: "var(--color-accent)" },
               { label: "Unallocated Applicants", value: result.unallocated_applicant_names.length, color: "var(--color-warning)" },
               { label: "Unfilled Positions", value: result.unfilled_position_titles.length, color: "var(--color-danger)" },
             ].map((k) => (
@@ -483,10 +566,10 @@ export function OptimizationClient() {
           </div>
 
           {/* Allocations grid */}
-          {result.allocations.length > 0 && (
+          {draftAllocations.length > 0 && (
             <>
               <h4 style={{ color: "var(--color-text-secondary)", marginBottom: "0.75rem", fontSize: 12, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                Assignments ({result.allocation_count})
+                Draft Assignments ({draftAllocations.length})
               </h4>
               <div
                 style={{
@@ -496,10 +579,40 @@ export function OptimizationClient() {
                   marginBottom: "1.5rem",
                 }}
               >
-                {result.allocations.map((al, i) => (
-                  <AllocationCard key={al.applicant_id} item={al} index={i} />
+                {draftAllocations.map((al, i) => (
+                  <AllocationCard 
+                    key={al.applicant_id} 
+                    item={al} 
+                    index={i} 
+                    onRemove={(id) => setDraftAllocations(prev => prev.filter(x => x.applicant_id !== id))} 
+                    openPositions={openPositions}
+                    onChangePosition={(appId, newPosId) => {
+                      const pos = openPositions.find(p => p.id === newPosId);
+                      if (pos) {
+                        setDraftAllocations(prev => prev.map(x => 
+                          x.applicant_id === appId 
+                            ? { ...x, position_id: pos.id, position_title: pos.title, department_name: pos.department?.name ?? null } 
+                            : x
+                        ));
+                      }
+                    }}
+                  />
                 ))}
               </div>
+              
+              {!commitSuccess && (
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "2rem" }}>
+                  <button
+                    className="btn btn-primary"
+                    disabled={committing}
+                    onClick={handleCommit}
+                    style={{ padding: "0.75rem 1.5rem", fontSize: 14 }}
+                  >
+                    <CheckCircle size={16} />
+                    {committing ? "Committing..." : `Commit ${draftAllocations.length} Assignments to Database`}
+                  </button>
+                </div>
+              )}
             </>
           )}
 

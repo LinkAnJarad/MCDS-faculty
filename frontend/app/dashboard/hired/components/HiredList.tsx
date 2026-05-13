@@ -23,9 +23,9 @@ export function HiredList() {
       try {
         const token = await getToken();
         if (token) {
-          // Fetch only applicants with 'hired' status
-          const data = await applicantsApi.list(token, "hired");
-          setHired(data);
+          // Fetch all applicants and filter by hired OR internal
+          const data = await applicantsApi.list(token);
+          setHired(data.filter(a => a.status === 'hired' || a.is_internal));
         }
       } catch (err) {
         console.error("Failed to load hired applicants", err);
@@ -112,11 +112,11 @@ export function HiredList() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-text-secondary)' }}>
                   <Briefcase size={14} style={{ color: 'var(--color-accent)' }} />
-                  <span>{app.years_experience} years experience</span>
+                  <span>{app.dynamic_data?.years_experience ?? 0} years experience</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-text-secondary)' }}>
                   <FileText size={14} style={{ color: 'var(--color-accent)' }} />
-                  <span>{app.research_outputs} research outputs</span>
+                  <span>{app.dynamic_data?.research_outputs ?? 0} research outputs</span>
                 </div>
               </div>
             </div>

@@ -22,13 +22,12 @@ export interface Applicant {
   last_name: string;
   email: string;
   highest_degree: HighestDegree;
-  years_experience: number;
-  research_outputs: number;
-  certifications: number;
+  dynamic_data: Record<string, any>;
   specialization: string | null;
   teaching_units_available: number;
   applied_position_id: string | null;
   status: ApplicantStatus;
+  is_internal: boolean;
   mcdm_score: number | null;
   created_at: string;
   updated_at?: string;
@@ -39,13 +38,12 @@ export interface ApplicantCreate {
   last_name: string;
   email: string;
   highest_degree: HighestDegree;
-  years_experience: number;
-  research_outputs: number;
-  certifications: number;
+  dynamic_data?: Record<string, any>;
   specialization?: string;
   teaching_units_available?: number;
   applied_position_id?: string | null;
   status?: ApplicantStatus;
+  is_internal?: boolean;
 }
 
 export interface Criteria {
@@ -322,6 +320,7 @@ export interface RunEvaluationRequest {
   save_scores?: boolean;
   custom_weights?: Record<string, number>;
   include_statuses?: string[];
+  applicant_type?: "external" | "internal" | "both";
 }
 
 export const evaluationApi = {
@@ -365,6 +364,18 @@ export interface RunOptimizationRequest {
   custom_weights?: Record<string, number>;
   position_ids?: string[];
   applicant_ids?: string[];
+  applicant_type?: "external" | "internal" | "both";
+}
+
+export interface CommitAllocationItem {
+  applicant_id: string;
+  position_id: string;
+  teaching_units: number;
+  alignment_score: number;
+}
+
+export interface CommitOptimizationRequest {
+  allocations: CommitAllocationItem[];
 }
 
 export const optimizationApi = {
@@ -378,6 +389,12 @@ export const optimizationApi = {
     apiFetch<OptimizationResult>("/api/v1/optimization/simulate", token, {
       method: "POST",
       body: JSON.stringify({ save_allocations: false, ...req }),
+    }),
+
+  commit: (token: string, req: CommitOptimizationRequest) =>
+    apiFetch<{ status: string; count: number; message: string }>("/api/v1/optimization/commit", token, {
+      method: "POST",
+      body: JSON.stringify(req),
     }),
 };
 

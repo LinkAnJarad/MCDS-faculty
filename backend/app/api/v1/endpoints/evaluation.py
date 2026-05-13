@@ -38,7 +38,12 @@ def run_evaluation(
     applicants = [
         a for a in all_applicants
         if (a.status.value if hasattr(a.status, "value") else str(a.status)) in target_statuses
+           or (a.is_internal and "hired" in target_statuses)
     ]
+    if req.applicant_type == "external":
+        applicants = [a for a in applicants if not a.is_internal]
+    elif req.applicant_type == "internal":
+        applicants = [a for a in applicants if a.is_internal]
 
     if not applicants:
         raise HTTPException(

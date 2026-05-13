@@ -11,12 +11,11 @@ class ApplicantBase(BaseModel):
     last_name: str
     email: EmailStr
     highest_degree: HighestDegree = HighestDegree.bachelors
-    years_experience: int = 0
-    research_outputs: int = 0
-    certifications: int = 0
+    dynamic_data: dict = {}
     specialization: Optional[str] = None
     teaching_units_available: int = 18
     applied_position_id: Optional[UUID] = None
+    is_internal: bool = False
     status: ApplicantStatus = ApplicantStatus.pending
 
 
@@ -29,12 +28,11 @@ class ApplicantUpdate(BaseModel):
     last_name: Optional[str] = None
     email: Optional[EmailStr] = None
     highest_degree: Optional[HighestDegree] = None
-    years_experience: Optional[int] = None
-    research_outputs: Optional[int] = None
-    certifications: Optional[int] = None
+    dynamic_data: Optional[dict] = None
     specialization: Optional[str] = None
     teaching_units_available: Optional[int] = None
     applied_position_id: Optional[UUID] = None
+    is_internal: Optional[bool] = None
     status: Optional[ApplicantStatus] = None
 
 
@@ -56,9 +54,8 @@ class ApplicantSummary(BaseModel):
     last_name: str
     email: str
     highest_degree: HighestDegree
-    years_experience: int
-    research_outputs: int
-    certifications: int
+    dynamic_data: dict
+    is_internal: bool
     status: ApplicantStatus
     mcdm_score: Optional[float] = None
     created_at: datetime

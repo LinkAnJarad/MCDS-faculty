@@ -39,6 +39,7 @@ export function ApplicantsClient() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Applicant | null>(null);
   const [stats, setStats] = useState({ total: 0, pending: 0, shortlisted: 0, hired: 0 });
+  const [currentTab, setCurrentTab] = useState<"applicants" | "hired">("applicants");
 
   const loadApplicants = useCallback(async () => {
     setLoading(true);
@@ -62,6 +63,11 @@ export function ApplicantsClient() {
   useEffect(() => { loadApplicants(); }, [loadApplicants]);
 
   const filtered = applicants.filter((a) => {
+    // Tab filter
+    const isHiredOrInternal = a.status === "hired" || a.is_internal;
+    if (currentTab === "hired" && !isHiredOrInternal) return false;
+    if (currentTab === "applicants" && isHiredOrInternal) return false;
+
     const q = search.toLowerCase();
     return (
       a.first_name.toLowerCase().includes(q) ||
@@ -110,6 +116,22 @@ export function ApplicantsClient() {
         ))}
       </div>
 
+      {/* ── Tabs ───────────────────────────────────────────── */}
+      <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", borderBottom: "1px solid var(--color-border-subtle)", paddingBottom: "0.5rem" }}>
+        <button
+          className={`btn ${currentTab === "applicants" ? "btn-primary" : "btn-ghost"}`}
+          onClick={() => setCurrentTab("applicants")}
+        >
+          Applicants
+        </button>
+        <button
+          className={`btn ${currentTab === "hired" ? "btn-primary" : "btn-ghost"}`}
+          onClick={() => setCurrentTab("hired")}
+        >
+          Hired Staff
+        </button>
+      </div>
+
       {/* ── Toolbar ────────────────────────────────────────── */}
       <div
         style={{
@@ -143,17 +165,19 @@ export function ApplicantsClient() {
         </div>
 
         {/* Status filter */}
-        <select
-          id="applicants-status-filter"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as ApplicantStatus | "all")}
-          className="input"
-          style={{ width: 160 }}
-        >
-          {STATUS_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+        {currentTab === "applicants" && (
+          <select
+            id="applicants-status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as ApplicantStatus | "all")}
+            className="input"
+            style={{ width: 160 }}
+          >
+            {STATUS_OPTIONS.filter(o => o.value !== "hired").map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        )}
 
         {/* Refresh */}
         <button
@@ -260,6 +284,7 @@ export function ApplicantsClient() {
                     <td style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
                       <div style={{ fontWeight: 600, fontSize: 13, color: "var(--color-text-primary)" }}>
                         {a.first_name} {a.last_name}
+                        {a.is_internal && <span style={{ marginLeft: 6, fontSize: 10, padding: "2px 6px", background: "var(--color-bg-hover)", borderRadius: 4 }}>Internal</span>}
                       </div>
                       {a.specialization && (
                         <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 1 }}>
@@ -274,13 +299,13 @@ export function ApplicantsClient() {
                       {DEGREE_LABELS[a.highest_degree] ?? a.highest_degree}
                     </td>
                     <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center" }}>
-                      {a.years_experience}
+                      {a.dynamic_data?.years_experience ?? 0}
                     </td>
                     <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center" }}>
-                      {a.research_outputs}
+                      {a.dynamic_data?.research_outputs ?? 0}
                     </td>
                     <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center" }}>
-                      {a.certifications}
+                      {a.dynamic_data?.certifications ?? 0}
                     </td>
                     <td style={{ padding: "12px 16px" }}>
                       <span

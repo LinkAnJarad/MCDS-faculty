@@ -39,5 +39,8 @@ class RunEvaluationRequest(BaseModel):
     custom_weights: Optional[dict[str, float]] = None
     """Optional {data_key: weight} overrides for what-if analysis (does not save)."""
 
-    include_statuses: list[str] = ["pending", "shortlisted"]
+    include_statuses: list[str] = ["pending", "shortlisted", "hired"]
     """Which applicant statuses to include in the evaluation."""
+
+    applicant_type: str = "both"
+    """Which applicant type to include: 'external', 'internal', or 'both'."""

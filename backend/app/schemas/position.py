@@ -11,6 +11,7 @@ class PositionBase(BaseModel):
     department_id: UUID
     required_units: int = 18
     requires_phd: bool = False
+    required_specialization: Optional[str] = None
     description: Optional[str] = None
     is_open: bool = True
 
@@ -24,6 +25,7 @@ class PositionUpdate(BaseModel):
     department_id: Optional[UUID] = None
     required_units: Optional[int] = None
     requires_phd: Optional[bool] = None
+    required_specialization: Optional[str] = None
     description: Optional[str] = None
     is_open: Optional[bool] = None
 

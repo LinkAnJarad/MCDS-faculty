@@ -66,12 +66,22 @@ def _get_raw_value(applicant: Applicant, data_key: str) -> float:
     """
     Extracts a numeric value from an Applicant for the given data_key.
     Converts the `highest_degree` enum to an ordinal scale.
+    Falls back to `dynamic_data` if not found as a standard attribute.
     """
     if data_key == "highest_degree":
         degree_val = applicant.highest_degree.value if hasattr(applicant.highest_degree, "value") else str(applicant.highest_degree)
         return DEGREE_ORDINAL.get(degree_val, 1.0)
-    value = getattr(applicant, data_key, 0)
-    return float(value) if value is not None else 0.0
+    
+    if hasattr(applicant, data_key):
+        value = getattr(applicant, data_key, 0)
+    else:
+        # Fallback to JSON dynamic data
+        value = applicant.dynamic_data.get(data_key, 0) if applicant.dynamic_data else 0
+
+    try:
+        return float(value) if value is not None else 0.0
+    except (ValueError, TypeError):
+        return 0.0
 
 
 class MCDMStrategy(ABC):

@@ -7,6 +7,7 @@ from app.core.security import require_auth
 from app.db.session import get_db
 from app.models.applicant import ApplicantStatus
 from app.schemas.applicant import ApplicantCreate, ApplicantResponse, ApplicantSummary, ApplicantUpdate
+from app.schemas.position import PositionUpdate
 
 router = APIRouter()
 
@@ -69,7 +70,17 @@ def update_applicant(
     if data.email and data.email != applicant.email:
         if crud.applicant.get_by_email(db, data.email):
             raise HTTPException(status_code=409, detail=f"Email '{data.email}' is already in use.")
-    return crud.applicant.update(db, applicant, data)
+            
+    # Update applicant
+    updated_applicant = crud.applicant.update(db, applicant, data)
+    
+    # If applicant is hired, close the associated position
+    if data.status == ApplicantStatus.hired and updated_applicant.applied_position_id:
+        pos = crud.position.get_by_id(db, updated_applicant.applied_position_id)
+        if pos and pos.is_open:
+            crud.position.update(db, pos, PositionUpdate(is_open=False))
+            
+    return updated_applicant
 
 
 @router.delete("/{applicant_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete applicant")
@@ -82,3 +93,5 @@ def delete_applicant(
     if not applicant:
         raise HTTPException(status_code=404, detail="Applicant not found.")
     crud.applicant.delete(db, applicant)
+
+

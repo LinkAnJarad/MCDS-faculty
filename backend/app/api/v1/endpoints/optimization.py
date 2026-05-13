@@ -12,7 +12,7 @@ from app.db.session import get_db
 from app.engines import mcdm as mcdm_engine
 from app.engines import optimizer as opt_engine
 from app.models.allocation import Allocation
-from app.schemas.optimization import OptimizationResultOut, RunOptimizationRequest
+from app.schemas.optimization import OptimizationResultOut, RunOptimizationRequest, CommitOptimizationRequest
 
 router = APIRouter()
 
@@ -34,11 +34,15 @@ def _run(req: RunOptimizationRequest, db: Session) -> OptimizationResultOut:
     eligible = [
         a for a in all_applicants
         if (a.status.value if hasattr(a.status, "value") else str(a.status))
-        in ("pending", "shortlisted")
+        in ("pending", "shortlisted", "hired") or a.is_internal
     ]
     if req.applicant_ids:
         aid_set = set(req.applicant_ids)
         eligible = [a for a in eligible if str(a.id) in aid_set]
+    if req.applicant_type == "external":
+        eligible = [a for a in eligible if not a.is_internal]
+    elif req.applicant_type == "internal":
+        eligible = [a for a in eligible if a.is_internal]
     if not eligible:
         raise HTTPException(status_code=422, detail="No eligible applicants (pending/shortlisted) found.")
 
@@ -164,3 +168,50 @@ def simulate_optimization(
     """
     req.save_allocations = False  # enforce no-save for simulation
     return _run(req, db)
+
+@router.post("/commit", summary="Commit reviewed allocations to DB")
+def commit_optimization(
+    req: CommitOptimizationRequest,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_auth),
+):
+    """
+    Manually commit a list of reviewed allocations to the database.
+    """
+    if not req.allocations:
+        return {"status": "ok", "message": "No allocations to commit", "count": 0}
+
+    # Clear previous allocations for affected positions
+    position_ids = {al.position_id for al in req.allocations}
+    db.query(Allocation).filter(
+        Allocation.position_id.in_([uuid.UUID(pid) for pid in position_ids])
+    ).delete(synchronize_session=False)
+
+    pos_objects = {str(p.id): p for p in crud.position.get_all(db, limit=500)}
+
+    for al in req.allocations:
+        pos = pos_objects.get(al.position_id)
+        dept_id = pos.department_id if pos else None
+        if not dept_id:
+            continue
+        
+        applicant_uuid = uuid.UUID(al.applicant_id)
+        
+        db.add(Allocation(
+            applicant_id=applicant_uuid,
+            position_id=uuid.UUID(al.position_id),
+            department_id=dept_id,
+            allocated_units=al.teaching_units,
+            alignment_score=al.alignment_score,
+            notes=f"Manually committed allocation (score={al.alignment_score:.4f})",
+        ))
+        
+        applicant = crud.applicant.get_by_id(db, applicant_uuid)
+        if applicant:
+            applicant.status = "hired"
+        
+        if pos:
+            pos.is_open = False
+
+    db.flush()
+    return {"status": "ok", "message": "Allocations committed successfully", "count": len(req.allocations)}

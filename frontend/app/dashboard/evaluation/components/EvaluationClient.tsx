@@ -230,6 +230,7 @@ export function EvaluationClient() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [applicantType, setApplicantType] = useState<"external" | "internal" | "both">("both");
 
   const handleExport = async (format: "pdf" | "excel") => {
     if (!result) return;
@@ -248,7 +249,7 @@ export function EvaluationClient() {
     try {
       const token = await getToken();
       if (!token) throw new Error("Not authenticated.");
-      const res = await evaluationApi.run(token, { save_scores: saveScores });
+      const res = await evaluationApi.run(token, { save_scores: saveScores, applicant_type: applicantType });
       setResult(res);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Evaluation failed.");
@@ -284,6 +285,17 @@ export function EvaluationClient() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 10, flexShrink: 0, flexWrap: "wrap", alignItems: "center" }}>
+          <select
+            className="input"
+            style={{ width: 150, padding: "0.55rem 0.8rem", fontSize: 13 }}
+            value={applicantType}
+            onChange={(e) => setApplicantType(e.target.value as "external" | "internal" | "both")}
+            disabled={running}
+          >
+            <option value="both">All Applicants</option>
+            <option value="external">External Only</option>
+            <option value="internal">Internal Staff Only</option>
+          </select>
           <button
             id="eval-run-preview-btn"
             className="btn btn-ghost"

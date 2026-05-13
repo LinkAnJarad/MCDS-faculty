@@ -2,10 +2,10 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Enum, ForeignKey, Integer, String
+from sqlalchemy import Enum, ForeignKey, Integer, String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from app.db.base import Base
 
@@ -43,11 +43,12 @@ class Applicant(Base):
     highest_degree: Mapped[HighestDegree] = mapped_column(
         Enum(HighestDegree, name="highestdegree"), nullable=False, default=HighestDegree.bachelors
     )
-    years_experience: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    research_outputs: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    certifications: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
     specialization: Mapped[str | None] = mapped_column(String(255), nullable=True)
     teaching_units_available: Mapped[int] = mapped_column(Integer, nullable=False, default=18)
+
+    # Dynamic application fields (MCDM inputs beyond the standard ones)
+    dynamic_data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
     # Application metadata
     applied_position_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -58,6 +59,7 @@ class Applicant(Base):
         nullable=False,
         default=ApplicantStatus.pending,
     )
+    is_internal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     mcdm_score: Mapped[float | None] = mapped_column(nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)

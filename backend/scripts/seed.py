@@ -36,13 +36,13 @@ def seed_db():
         # 2. Positions
         print("Seeding Positions...")
         positions = [
-            Position(title="Assistant Professor (Web Tech)", department_id=ccs.id, required_units=12, requires_phd=False, is_open=True),
-            Position(title="Associate Professor (Cybersecurity)", department_id=ccs.id, required_units=15, requires_phd=True, is_open=True),
-            Position(title="Professor (Structural Engineering)", department_id=coe.id, required_units=12, requires_phd=True, is_open=True),
-            Position(title="Lecturer (Mathematics)", department_id=cos.id, required_units=18, requires_phd=False, is_open=True),
-            Position(title="Assistant Professor (Quantum Physics)", department_id=cos.id, required_units=12, requires_phd=True, is_open=True),
-            Position(title="Associate Professor (Financial Management)", department_id=cba.id, required_units=15, requires_phd=True, is_open=True),
-            Position(title="Assistant Professor (Marketing)", department_id=cba.id, required_units=15, requires_phd=False, is_open=True),
+            Position(title="Assistant Professor (Web Tech)", department_id=ccs.id, required_units=12, requires_phd=False, required_specialization="Computer Science", is_open=True),
+            Position(title="Associate Professor (Cybersecurity)", department_id=ccs.id, required_units=15, requires_phd=True, required_specialization="Cybersecurity", is_open=True),
+            Position(title="Professor (Structural Engineering)", department_id=coe.id, required_units=12, requires_phd=True, required_specialization="Civil Engineering", is_open=True),
+            Position(title="Lecturer (Mathematics)", department_id=cos.id, required_units=18, requires_phd=False, required_specialization="Mathematics", is_open=True),
+            Position(title="Assistant Professor (Quantum Physics)", department_id=cos.id, required_units=12, requires_phd=True, required_specialization="Physics", is_open=True),
+            Position(title="Associate Professor (Financial Management)", department_id=cba.id, required_units=15, requires_phd=True, required_specialization="Finance", is_open=True),
+            Position(title="Assistant Professor (Marketing)", department_id=cba.id, required_units=15, requires_phd=False, required_specialization="Marketing", is_open=True),
         ]
         db.add_all(positions)
         db.flush()
@@ -60,30 +60,43 @@ def seed_db():
 
         # 4. Applicants
         print("Seeding Applicants...")
-        # Create some applicants for CCS
+        
+        # CCS Applicants
         ccs_apps = [
-            Applicant(first_name="John", last_name="Doe", email="john.doe@university.edu", highest_degree=HighestDegree.doctorate, years_experience=10, research_outputs=15, certifications=4, specialization="Computer Science", teaching_units_available=12, status=ApplicantStatus.shortlisted),
-            Applicant(first_name="Jane", last_name="Smith", email="jane.smith@it-pro.com", highest_degree=HighestDegree.masters, years_experience=5, research_outputs=3, certifications=8, specialization="Cybersecurity", teaching_units_available=15, status=ApplicantStatus.pending),
-            Applicant(first_name="Alan", last_name="Turing", email="alan.t@logic.org", highest_degree=HighestDegree.post_doctorate, years_experience=20, research_outputs=50, certifications=0, specialization="Cryptography", teaching_units_available=10, status=ApplicantStatus.shortlisted),
+            # High score, but doesn't have a PhD, so optimizer won't assign to the Cybersecurity Professor role
+            Applicant(first_name="Marcus", last_name="Chen", email="marcus.c@tech-corp.com", highest_degree=HighestDegree.masters, specialization="Computer Science", teaching_units_available=15, status=ApplicantStatus.shortlisted, is_internal=False, dynamic_data={"years_experience": 15, "research_outputs": 20, "certifications": 8}),
+            # Meets PhD requirement, external (can only take 1 role)
+            Applicant(first_name="Dr. Elena", last_name="Rostova", email="elena.r@university.edu", highest_degree=HighestDegree.doctorate, specialization="Cybersecurity", teaching_units_available=15, status=ApplicantStatus.shortlisted, is_internal=False, dynamic_data={"years_experience": 8, "research_outputs": 15, "certifications": 5}),
+            # Internal candidate, can take multiple roles if units allow (e.g., 27 units available)
+            Applicant(first_name="Dr. Samuel", last_name="Oak", email="samuel.o@university.edu", highest_degree=HighestDegree.doctorate, specialization="Computer Science", teaching_units_available=27, status=ApplicantStatus.pending, is_internal=True, dynamic_data={"years_experience": 12, "research_outputs": 25, "certifications": 3}),
+            # Has PhD but strictly low teaching units available
+            Applicant(first_name="Dr. Chloe", last_name="Price", email="chloe.p@startup.io", highest_degree=HighestDegree.post_doctorate, specialization="Cybersecurity", teaching_units_available=6, status=ApplicantStatus.pending, is_internal=False, dynamic_data={"years_experience": 4, "research_outputs": 35, "certifications": 2}),
         ]
         
-        # Create some applicants for COE
+        # COE Applicants
         coe_apps = [
-            Applicant(first_name="Emily", last_name="Roebling", email="emily.r@bridge.edu", highest_degree=HighestDegree.masters, years_experience=12, research_outputs=8, certifications=5, specialization="Civil Engineering", teaching_units_available=15, status=ApplicantStatus.shortlisted),
-            Applicant(first_name="Nikola", last_name="Tesla", email="nikola.t@energy.com", highest_degree=HighestDegree.doctorate, years_experience=15, research_outputs=30, certifications=10, specialization="Electrical Engineering", teaching_units_available=12, status=ApplicantStatus.pending),
+            # Exact specialization match
+            Applicant(first_name="Dr. Robert", last_name="Hale", email="robert.h@buildcorp.net", highest_degree=HighestDegree.doctorate, specialization="Civil Engineering", teaching_units_available=15, status=ApplicantStatus.shortlisted, is_internal=False, dynamic_data={"years_experience": 12, "research_outputs": 8, "certifications": 5}),
+            # High score, but wrong specialization (Electrical)
+            Applicant(first_name="Dr. Ananya", last_name="Sharma", email="ananya.s@grid.com", highest_degree=HighestDegree.doctorate, specialization="Electrical Engineering", teaching_units_available=12, status=ApplicantStatus.pending, is_internal=False, dynamic_data={"years_experience": 15, "research_outputs": 30, "certifications": 10}),
+            # Junior applicant
+            Applicant(first_name="Miguel", last_name="Santos", email="miguel.s@alumni.edu", highest_degree=HighestDegree.bachelors, specialization="Civil Engineering", teaching_units_available=21, status=ApplicantStatus.pending, is_internal=False, dynamic_data={"years_experience": 3, "research_outputs": 0, "certifications": 1}),
         ]
 
-        # Create some applicants for COS
+        # COS Applicants
         cos_apps = [
-            Applicant(first_name="Marie", last_name="Curie", email="marie.c@science.fr", highest_degree=HighestDegree.post_doctorate, years_experience=18, research_outputs=45, certifications=2, specialization="Physics", teaching_units_available=9, status=ApplicantStatus.shortlisted),
-            Applicant(first_name="Isaac", last_name="Newton", email="isaac.n@gravity.uk", highest_degree=HighestDegree.doctorate, years_experience=25, research_outputs=40, certifications=0, specialization="Mathematics", teaching_units_available=15, status=ApplicantStatus.pending),
-            Applicant(first_name="Katherine", last_name="Johnson", email="katherine.j@nasa.gov", highest_degree=HighestDegree.masters, years_experience=10, research_outputs=12, certifications=3, specialization="Mathematics", teaching_units_available=18, status=ApplicantStatus.shortlisted),
+            Applicant(first_name="Dr. Wei", last_name="Lin", email="wei.lin@research.org", highest_degree=HighestDegree.post_doctorate, specialization="Physics", teaching_units_available=12, status=ApplicantStatus.shortlisted, is_internal=True, dynamic_data={"years_experience": 18, "research_outputs": 45, "certifications": 2}),
+            Applicant(first_name="Dr. Sarah", last_name="Jenkins", email="s.jenkins@math-institute.uk", highest_degree=HighestDegree.doctorate, specialization="Mathematics", teaching_units_available=15, status=ApplicantStatus.pending, is_internal=False, dynamic_data={"years_experience": 25, "research_outputs": 40, "certifications": 0}),
+            Applicant(first_name="David", last_name="Miller", email="d.miller@school.edu", highest_degree=HighestDegree.masters, specialization="Mathematics", teaching_units_available=18, status=ApplicantStatus.shortlisted, is_internal=False, dynamic_data={"years_experience": 10, "research_outputs": 12, "certifications": 3}),
+            # Incredible researcher, but only available for very limited teaching
+            Applicant(first_name="Dr. Yuri", last_name="Kovalev", email="yuri.k@space.gov", highest_degree=HighestDegree.post_doctorate, specialization="Physics", teaching_units_available=3, status=ApplicantStatus.pending, is_internal=False, dynamic_data={"years_experience": 20, "research_outputs": 80, "certifications": 5}),
         ]
 
-        # Create some applicants for CBA
+        # CBA Applicants
         cba_apps = [
-            Applicant(first_name="Warren", last_name="Buffett", email="warren.b@value.com", highest_degree=HighestDegree.masters, years_experience=40, research_outputs=5, certifications=1, specialization="Finance", teaching_units_available=12, status=ApplicantStatus.pending),
-            Applicant(first_name="Sheryl", last_name="Sandberg", email="sheryl.s@leanin.org", highest_degree=HighestDegree.masters, years_experience=15, research_outputs=10, certifications=4, specialization="Management", teaching_units_available=15, status=ApplicantStatus.shortlisted),
+            Applicant(first_name="Olivia", last_name="Benson", email="olivia.b@finance-group.com", highest_degree=HighestDegree.masters, specialization="Finance", teaching_units_available=18, status=ApplicantStatus.pending, is_internal=True, dynamic_data={"years_experience": 14, "research_outputs": 5, "certifications": 7}),
+            Applicant(first_name="James", last_name="Wilson", email="james.w@marketing-agency.net", highest_degree=HighestDegree.masters, specialization="Marketing", teaching_units_available=15, status=ApplicantStatus.shortlisted, is_internal=False, dynamic_data={"years_experience": 15, "research_outputs": 10, "certifications": 4}),
+            Applicant(first_name="Dr. Arthur", last_name="Pendleton", email="apendleton@u.edu", highest_degree=HighestDegree.doctorate, specialization="Finance", teaching_units_available=15, status=ApplicantStatus.pending, is_internal=False, dynamic_data={"years_experience": 8, "research_outputs": 14, "certifications": 9}),
         ]
 
         all_applicants = ccs_apps + coe_apps + cos_apps + cba_apps

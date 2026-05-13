@@ -39,3 +39,15 @@ class RunOptimizationRequest(BaseModel):
 
     applicant_ids: Optional[list[str]] = None
     """Restrict optimization to a subset of applicants. None = all scored applicants."""
+
+    applicant_type: str = "both"
+    """Which applicant type to include: 'external', 'internal', or 'both'."""
+
+class CommitAllocationItem(BaseModel):
+    applicant_id: str
+    position_id: str
+    teaching_units: int
+    alignment_score: float
+
+class CommitOptimizationRequest(BaseModel):
+    allocations: list[CommitAllocationItem]

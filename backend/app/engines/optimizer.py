@@ -62,11 +62,15 @@ def _is_feasible(applicant: Applicant, position: Position) -> bool:
     institutional constraint. Currently enforces:
     - PhD requirement
     - Minimum teaching unit availability
+    - Specialization matching (if position requires it)
     """
     if position.requires_phd and _applicant_degree(applicant) not in PHD_DEGREES:
         return False
     if applicant.teaching_units_available < position.required_units:
         return False
+    if position.required_specialization:
+        if not applicant.specialization or applicant.specialization.strip().lower() != position.required_specialization.strip().lower():
+            return False
     return True
 
 
@@ -138,12 +142,24 @@ def run_optimization(
         ), "MaximizeTotalScore"
 
     # ── Assignment constraints ────────────────────────────────────────────────
-    # Each applicant assigned to at most 1 position
+    # External applicants assigned to at most 1 position
+    # Internal/hired applicants can take multiple positions up to their teaching unit limit
     for a in applicants:
         a_id = str(a.id)
+        is_internal_or_hired = getattr(a, "is_internal", False) or (
+            a.status.value if hasattr(a.status, "value") else str(a.status)
+        ) == "hired"
+
+        if not is_internal_or_hired:
+            prob += (
+                pulp.lpSum(x[a_id][str(p.id)] for p in positions) <= 1,
+                f"one_position_per_external_{a_id}",
+            )
+            
+        # For all applicants: sum of required units of assigned positions <= available teaching units
         prob += (
-            pulp.lpSum(x[a_id][str(p.id)] for p in positions) <= 1,
-            f"one_position_per_applicant_{a_id}",
+            pulp.lpSum(x[a_id][str(p.id)] * p.required_units for p in positions) <= a.teaching_units_available,
+            f"max_teaching_units_{a_id}",
         )
 
     # Each position filled by at most 1 applicant

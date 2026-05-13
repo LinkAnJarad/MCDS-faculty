@@ -27,6 +27,7 @@ class Position(Base):
     required_units: Mapped[int] = mapped_column(Integer, nullable=False, default=18)
     requires_phd: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    required_specialization: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_open: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 

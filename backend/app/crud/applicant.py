@@ -48,11 +48,14 @@ def delete(db: Session, applicant: Applicant) -> None:
 def count_by_status(db: Session) -> dict[str, int]:
     """Returns a count breakdown by status — used for dashboard KPIs."""
     rows = (
-        db.query(Applicant.status, Applicant.id)
+        db.query(Applicant.status, Applicant.is_internal)
         .all()
     )
     counts: dict[str, int] = {s.value: 0 for s in ApplicantStatus}
-    for row in rows:
-        counts[row.status.value] += 1
-    counts["total"] = sum(counts.values())
+    for status, is_internal in rows:
+        if is_internal:
+            counts["hired"] += 1
+        else:
+            counts[status.value] += 1
+    counts["total"] = len(rows)
     return counts
